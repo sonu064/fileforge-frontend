@@ -1,60 +1,89 @@
-import {createContext, useCallback, useEffect, useState} from "react";
-import {useAuth} from "@clerk/clerk-react";
+/* eslint-disable react-refresh/only-export-components */
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { useAuth } from "./AuthContext.jsx";
 import axios from "axios";
-import {apiEndpoints} from "../util/apiEndpoints.js";
-import toast from "react-hot-toast";
+import { apiEndpoints } from "../util/apiEndpoints.js";
+import { getAuthHeaders } from "../util/authToken.js";
 
-export const UserCreditsContext = createContext();
+export const UserCreditsContext = createContext(null);
 
-export const UserCreditsProvider = ({children}) => {
-    const [credits, setCredits] = useState(5);
+/** Single source of truth for upload credits — always from GET /users/credits. */
+export const UserCreditsProvider = ({ children }) => {
+    const [credits, setCredits] = useState(null);
     const [loading, setLoading] = useState(false);
-    const {getToken, isSignedIn} = useAuth();
+    const { getToken, isSignedIn, user, updateUser } = useAuth();
 
-
-    //Function to fetch the user credits that can be called from anywhere
     const fetchUserCredits = useCallback(async () => {
-        if (!isSignedIn) return;
+        if (!isSignedIn) {
+            setCredits(null);
+            return null;
+        }
 
         setLoading(true);
-
         try {
-            const token = await getToken();
-            const response = await axios.get(apiEndpoints.GET_CREDITS, {headers: {Authorization: `Bearer ${token}`}});
-            if (response.status === 200) {
-                setCredits(response.data.credits);
-            } else {
-                toast.error('Unable to get the credits.');
-            }
-        }catch (error) {
-            console.error('Error fetching the user credits', error);
-        }finally {
+            const headers = await getAuthHeaders(getToken);
+            const { data } = await axios.get(apiEndpoints.GET_CREDITS, { headers });
+            const value = data?.credits ?? 0;
+            setCredits(value);
+            updateUser?.({ credits: value });
+            return value;
+        } catch (error) {
+            console.error("[Credits] fetch failed:", error.response?.data || error.message);
+            return null;
+        } finally {
             setLoading(false);
         }
-    },[getToken, isSignedIn]);
+    }, [getToken, isSignedIn, updateUser]);
 
+    /** Apply credits returned from upload API (remainingCredits field). */
+    const applyRemainingCredits = useCallback(
+        (remaining) => {
+            if (remaining === undefined || remaining === null) return;
+            setCredits(remaining);
+            updateUser?.({ credits: remaining });
+        },
+        [updateUser]
+    );
+
+    const updateCredits = useCallback(
+        (newCredits) => {
+            if (newCredits === undefined || newCredits === null) return;
+            setCredits(newCredits);
+            updateUser?.({ credits: newCredits });
+        },
+        [updateUser]
+    );
+
+    // Bootstrap from login profile, then refresh from API for authoritative value.
     useEffect(() => {
-        if (isSignedIn)
-            fetchUserCredits();
-    }, [fetchUserCredits, isSignedIn]);
-
-
-    const updateCredits = useCallback(newCredits => {
-        console.log('Updating the credits', newCredits);
-        setCredits(newCredits);
-    }, []);
-
+        if (!isSignedIn) {
+            setCredits(null);
+            return;
+        }
+        if (user?.credits != null && credits === null) {
+            setCredits(user.credits);
+        }
+        fetchUserCredits();
+    }, [isSignedIn, user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const contextValue = {
         credits,
-        setCredits,
+        setCredits: updateCredits,
+        loading,
         fetchUserCredits,
-        updateCredits
-    }
+        updateCredits,
+        applyRemainingCredits,
+    };
 
     return (
         <UserCreditsContext.Provider value={contextValue}>
             {children}
         </UserCreditsContext.Provider>
-    )
-}
+    );
+};
+
+export const useUserCredits = () => {
+    const ctx = useContext(UserCreditsContext);
+    if (!ctx) throw new Error("useUserCredits must be used within UserCreditsProvider");
+    return ctx;
+};

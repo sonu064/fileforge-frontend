@@ -1,0 +1,17 @@
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="ff-grad" x1="6" y1="4" x2="42" y2="44" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8B5CF6"/>
+      <stop offset="0.5" stop-color="#6366F1"/>
+      <stop offset="1" stop-color="#EC4899"/>
+    </linearGradient>
+    <linearGradient id="ff-soft" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.75"/>
+    </linearGradient>
+  </defs>
+  <rect x="3" y="3" width="42" height="42" rx="12" fill="url(#ff-grad)"/>
+  <path d="M17 12h9.5L33 18.5V33a3 3 0 0 1-3 3H17a3 3 0 0 1-3-3V15a3 3 0 0 1 3-3Z" fill="url(#ff-soft)"/>
+  <path d="M26.5 12 33 18.5h-4.5a2 2 0 0 1-2-2V12Z" fill="#C4B5FD"/>
+  <path d="M24.6 19.5 19.5 27h3.6l-1.4 6 6.2-8.5h-3.7l1.4-5h-1Z" fill="url(#ff-grad)" stroke="#ffffff" stroke-width="0.6" stroke-linejoin="round"/>
+</svg>

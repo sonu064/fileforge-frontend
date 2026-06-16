@@ -1,11 +1,10 @@
 import DashboardLayout from "../layout/DashboardLayout.jsx";
 import {useContext, useState} from "react";
-import {useAuth} from "@clerk/clerk-react";
+import {useAuth} from "../context/AuthContext.jsx";
 import {UserCreditsContext} from "../context/UserCreditsContext.jsx";
 import {AlertCircle} from "lucide-react";
-import axios from "axios";
-import {apiEndpoints} from "../util/apiEndpoints.js";
 import UploadBox from "../components/UploadBox.jsx";
+import {getUploadErrorMessage, uploadFilesRequest} from "../util/uploadFiles.js";
 
 
 const Upload = () => {
@@ -14,7 +13,7 @@ const Upload = () => {
     const [message, setMessage] = useState("");
     const [messageType, setMessageType] = useState(""); //success or error
     const {getToken} = useAuth();
-    const {credits, setCredits} = useContext(UserCreditsContext);
+    const {credits, applyRemainingCredits} = useContext(UserCreditsContext);
     const MAX_FILES = 5;
 
     const handleFileChange = (e) => {
@@ -55,37 +54,33 @@ const Upload = () => {
         setMessage("Uploading files...");
         setMessageType("info");
 
-        const formData = new FormData();
-        files.forEach((file) => formData.append("files", file));
-
         try {
-            const token = await getToken();
-            const response = await axios.post(apiEndpoints.UPLOAD_FILE, formData, {headers: {"Content-Type": "multipart/form-data", Authorization: `Bearer ${token}`}});
-
-            if (response.data && response.data.remainingCredits !== undefined) {
-                setCredits(response.data.remainingCredits);
-            }
+            const data = await uploadFilesRequest(files, getToken);
+            applyRemainingCredits(data?.remainingCredits);
 
             setMessage("Files uploaded successfully.");
             setMessageType("success");
             setFiles([]);
         }catch(error) {
-            console.error('Error uploading files: ', error);
-            setMessage(error.response?.data?.message || "Error uploading files. Please try again.");
+            setMessage(getUploadErrorMessage(error));
             setMessageType("error");
         }finally {
             setUploading(false);
         }
     }
 
-    const isUploadDisabled = files.length === 0 || files.length > MAX_FILES || credits <= 0 || files.length > credits;
+    const isUploadDisabled = files.length === 0 || files.length > MAX_FILES || credits == null || credits <= 0 || files.length > credits;
 
 
     return (
         <DashboardLayout activeMenu="Upload">
-            <div className="p-6">
+            <div className="p-5 sm:p-7">
+                <div className="mb-6 max-w-3xl mx-auto">
+                    <h1 className="font-display text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">Upload Files</h1>
+                    <p className="text-slate-500 dark:text-slate-400 mt-1">Add new files to your secure cloud storage.</p>
+                </div>
                 {message && (
-                    <div className={`mb-6 p-4 rounded-lg flex items-center gap-3 ${messageType === 'error' ? 'bg-red-50 text-red-700': messageType === 'success' ? 'bg-green-50 text-green-700': 'bg-blue-50 text-blue-700'}`}>
+                    <div className={`mb-6 max-w-3xl mx-auto p-4 rounded-xl flex items-center gap-3 text-sm font-medium ${messageType === 'error' ? 'bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-300': messageType === 'success' ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300': 'bg-brand-50 dark:bg-brand-500/10 text-brand-700 dark:text-brand-300'}`}>
                         {messageType === 'error' && <AlertCircle size={20} />}
                         {message}
                     </div>

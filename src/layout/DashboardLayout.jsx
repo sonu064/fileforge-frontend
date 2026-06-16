@@ -1,24 +1,32 @@
-import {useUser} from "@clerk/clerk-react";
+import { useUser } from "../context/AuthContext.jsx";
+import { motion } from "framer-motion";
 import Navbar from "../components/Navbar.jsx";
 import SideMenu from "../components/SideMenu.jsx";
 
-const DashboardLayout = ({children, activeMenu}) => {
-    const {user} = useUser();
+const DashboardLayout = ({ children, activeMenu }) => {
+    const { user } = useUser();
+
     return (
-        <div>
-            {/* Navbar component goes here*/}
-            <Navbar activeMenu={activeMenu}/>
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+            <Navbar activeMenu={activeMenu} />
             {user && (
                 <div className="flex">
                     <div className="max-[1080px]:hidden">
-                        {/* Sidemenu goes here */}
-                        <SideMenu activeMenu={activeMenu}/>
+                        <SideMenu activeMenu={activeMenu} />
                     </div>
-                    <div className="grow mx-5">{children}</div>
+                    <motion.div
+                        key={activeMenu}
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.35, ease: "easeOut" }}
+                        className="grow min-w-0"
+                    >
+                        {children}
+                    </motion.div>
                 </div>
             )}
         </div>
-    )
-}
+    );
+};
 
 export default DashboardLayout;

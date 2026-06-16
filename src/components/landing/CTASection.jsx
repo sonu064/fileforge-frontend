@@ -1,23 +1,42 @@
-const CTASection = ({openSignUp}) => {
+import { motion } from "framer-motion";
+import { ArrowRight } from "lucide-react";
+import { viewportOnce } from "../../util/motion.js";
+
+const CTASection = ({ openSignUp }) => {
     return (
-        <div className="bg-purple-500">
-            <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:py-16 lg:px-8 lg:flex lg:items-center lg:justify-between">
-                <h2 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-                    <span className="block">Ready to get started?</span>
-                    <span className="block text-purple-100">Create your account today.</span>
-                </h2>
-                <div className="mt-8 flex lg:mt-0 lg:flex-shrink-0">
-                    <div className="inline-flex rounded-md shadow">
-                        <button
-                            onClick={() => openSignUp()}
-                            className="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-purple-600 bg-white hover:bg-purple-50 transition-colors duration-200">
-                            Sign up for free
-                        </button>
+        <section className="py-24">
+            <div className="section-pad">
+                <motion.div
+                    initial={{ opacity: 0, y: 30 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={viewportOnce}
+                    transition={{ duration: 0.6 }}
+                    className="relative overflow-hidden rounded-3xl gradient-bg px-8 py-16 sm:px-16 sm:py-20 text-center shadow-2xl shadow-brand-500/30"
+                >
+                    <div className="pointer-events-none absolute -top-20 -right-20 h-64 w-64 rounded-full bg-white/20 blur-3xl" />
+                    <div className="pointer-events-none absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-black/10 blur-3xl" />
+
+                    <div className="relative">
+                        <h2 className="font-display text-3xl sm:text-5xl font-extrabold text-white max-w-3xl mx-auto leading-tight">
+                            Ready to forge a better way to share files?
+                        </h2>
+                        <p className="mt-5 text-lg text-white/90 max-w-xl mx-auto">
+                            Create your free FileForge account today — no credit card required.
+                        </p>
+                        <div className="mt-9 flex flex-col sm:flex-row gap-4 justify-center">
+                            <button
+                                onClick={() => openSignUp()}
+                                className="group inline-flex items-center justify-center gap-2 bg-white text-brand-600 font-bold rounded-xl px-8 py-4 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all cursor-pointer"
+                            >
+                                Get started for free
+                                <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                            </button>
+                        </div>
                     </div>
-                </div>
+                </motion.div>
             </div>
-        </div>
-    )
-}
+        </section>
+    );
+};
 
 export default CTASection;

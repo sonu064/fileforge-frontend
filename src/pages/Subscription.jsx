@@ -1,10 +1,11 @@
 import DashboardLayout from "../layout/DashboardLayout.jsx";
 import {useContext, useEffect, useRef, useState} from "react";
-import {useAuth, useUser} from "@clerk/clerk-react";
+import {useAuth, useUser} from "../context/AuthContext.jsx";
 import {UserCreditsContext} from "../context/UserCreditsContext.jsx";
 import axios from "axios";
 import {apiEndpoints} from "../util/apiEndpoints.js";
-import {AlertCircle, Check, CreditCard, Loader2} from "lucide-react";
+import {AlertCircle, Check, CreditCard, Loader2, Sparkles} from "lucide-react";
+import {motion} from "framer-motion";
 
 const Subscription = () => {
     const [processingPayment, setProcessingPayment] = useState(false);
@@ -14,7 +15,7 @@ const Subscription = () => {
 
     const {getToken} = useAuth();
     const razorpayScriptRef = useRef(null);
-    const {credits, setCredits, fetchUserCredits} = useContext(UserCreditsContext);
+    const {credits, updateCredits, fetchUserCredits} = useContext(UserCreditsContext);
 
     const {user} = useUser();
 
@@ -76,27 +77,6 @@ const Subscription = () => {
         };
     }, []);
 
-    // Fetch user credits on component mount
-    useEffect(() => {
-        const fetchUserCredits = async () => {
-            try {
-                const token = await getToken();
-                const response = await axios.get(apiEndpoints.GET_CREDITS, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-                setCredits(response.data.credits);
-            } catch (error) {
-                console.error("Error fetching user credits:", error);
-                setMessage("Failed to load your current credits. Please try again later.");
-                setMessageType("error");
-            }
-        };
-
-        fetchUserCredits();
-    }, [getToken]);
-
     const handlePurchase = async (plan) => {
         if (!razorpayLoaded) {
             setMessage('Payment gateway is still loading. Please wait a moment and try again.');
@@ -120,11 +100,29 @@ const Subscription = () => {
                 }
             });
 
+            console.log('Create-order response:', response.data);
+
+            // Abort early if the backend could not create the order (e.g. bad keys, invalid amount).
+            if (!response.data?.success || !response.data?.orderId) {
+                setMessage(response.data?.message || "Could not start the payment. Please try again.");
+                setMessageType("error");
+                return;
+            }
+
+            // Prefer the key returned by the backend so the checkout key always matches the
+            // account that created the order; fall back to the build-time env var.
+            const razorpayKey = response.data.keyId || import.meta.env.VITE_RAZORPAY_KEY_ID;
+            if (!razorpayKey || razorpayKey.includes("ADD_YOUR")) {
+                setMessage("Payment gateway key is not configured. Please contact support.");
+                setMessageType("error");
+                return;
+            }
+
             const options = {
-                key: import.meta.env.VITE_RAZORPAY_KEY,
+                key: razorpayKey,
                 amount: plan.price * 100,
                 currency: "INR",
-                name: "CloudShare",
+                name: "FileForge",
                 description: `Purchase ${plan.credits} credits`,
                 order_id: response.data.orderId,
                 handler: async function (response) {
@@ -144,7 +142,7 @@ const Subscription = () => {
                             // Update credits immediately with the value from the response
                             if (verifyResponse.data.credits) {
                                 console.log('Updating credits to:', verifyResponse.data.credits);
-                                setCredits(verifyResponse.data.credits);
+                                updateCredits(verifyResponse.data.credits);
                             } else {
                                 // If credits not in response, fetch the latest credits from the server
                                 console.log('Credits not in response, fetching latest credits');
@@ -164,15 +162,28 @@ const Subscription = () => {
                     }
                 },
                 prefill: {
-                    name: user.fullName,
-                    email: user.primaryEmailAddress
+                    name: user?.fullName || "",
+                    email: user?.primaryEmailAddress?.emailAddress || ""
+                },
+                modal: {
+                    ondismiss: function () {
+                        setMessage("Payment cancelled.");
+                        setMessageType("error");
+                    }
                 },
                 theme: {
-                    color: "#3B82F6"
+                    color: "#8B5CF6"
                 }
             };
+            console.log('Razorpay options:', options);
             if (window.Razorpay) {
                 const razorpay = new window.Razorpay(options);
+                // Surface gateway-side failures (invalid key, declined card, etc.) instead of a silent popup.
+                razorpay.on('payment.failed', function (resp) {
+                    console.error('Razorpay payment.failed:', resp.error);
+                    setMessage(`Payment failed: ${resp.error?.description || "Please try again."}`);
+                    setMessageType("error");
+                });
                 razorpay.open();
             } else {
                 throw new Error('Razorpay SDK not loaded');
@@ -188,59 +199,68 @@ const Subscription = () => {
 
     return (
         <DashboardLayout activeMenu="Subscription">
-            <div className="p-6">
-                <h1 className="text-2xl font-bold mb-2">Subscription Plans</h1>
-                <p className="text-gray-600 mb-6">Choose a plan that works for you</p>
+            <div className="p-5 sm:p-7">
+                <div className="mb-6">
+                    <h1 className="font-display text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">Subscription Plans</h1>
+                    <p className="text-slate-500 dark:text-slate-400 mt-1">Power up your storage with more credits.</p>
+                </div>
 
                 {message && (
-                    <div className={`mb-6 p-4 rounded-lg flex items-center gap-3 ${
-                        messageType === 'error' ? 'bg-red-50 text-red-700' :
-                            messageType === 'success' ? 'bg-green-50 text-green-700' :
-                                'bg-blue-50 text-blue-700'
+                    <div className={`mb-6 p-4 rounded-xl flex items-center gap-3 text-sm font-medium ${
+                        messageType === 'error' ? 'bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-300' :
+                            messageType === 'success' ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' :
+                                'bg-brand-50 dark:bg-brand-500/10 text-brand-700 dark:text-brand-300'
                     }`}>
                         {messageType === 'error' && <AlertCircle size={20} />}
                         {message}
                     </div>
                 )}
 
-                <div className="flex flex-col md:flex-row gap-6 mb-8">
-                    <div className="bg-blue-50 p-6 rounded-lg">
-                        <div className="flex items-center gap-2 mb-4">
-                            <CreditCard className="text-purple-500" />
-                            <h2 className="text-lg font-medium">Current Credits: <span className="font-bold text-purple-500">{credits}</span></h2>
+                {/* Current credits banner */}
+                <div className="relative overflow-hidden rounded-2xl gradient-bg p-6 mb-8 text-white shadow-lg shadow-brand-500/30">
+                    <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/15 blur-2xl" />
+                    <div className="relative flex items-center gap-3">
+                        <div className="h-12 w-12 rounded-2xl bg-white/20 grid place-items-center">
+                            <CreditCard size={24} />
                         </div>
-                        <p className="text-sm text-gray-600 mt-2">
-                            You can upload {credits} more files with your current credits.
-                        </p>
+                        <div>
+                            <p className="text-sm text-white/80">Current balance</p>
+                            <p className="font-display text-3xl font-extrabold">{credits} credits</p>
+                        </div>
                     </div>
+                    <p className="relative text-sm text-white/80 mt-3">You can upload {credits} more files with your current credits.</p>
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-6">
                     {plans.map((plan) => (
-                        <div
+                        <motion.div
                             key={plan.id}
-                            className={`border rounded-xl p-6 ${
+                            whileHover={{ y: -6 }}
+                            transition={{ type: "spring", stiffness: 300, damping: 22 }}
+                            className={`relative rounded-3xl p-7 transition-shadow ${
                                 plan.recommended
-                                    ? 'border-purple-200 bg-purple-50 shadow-md'
-                                    : 'border-gray-200 bg-white'
+                                    ? 'bg-gradient-to-b from-brand-500 to-brand2-600 text-white shadow-2xl shadow-brand-500/40'
+                                    : 'card-surface hover:shadow-xl'
                             }`}
                         >
                             {plan.recommended && (
-                                <div className="inline-block bg-purple-500 text-white text-xs font-semibold px-3 py-1 rounded-full mb-4">
-                                    RECOMMENDED
-                                </div>
+                                <span className="absolute -top-3 left-7 inline-flex items-center gap-1 bg-white text-brand-600 text-xs font-bold px-3 py-1 rounded-full shadow">
+                                    <Sparkles size={12} /> Recommended
+                                </span>
                             )}
-                            <h3 className="text-xl font-bold">{plan.name}</h3>
-                            <div className="mt-2 mb-4">
-                                <span className="text-3xl font-bold">₹{plan.price}</span>
-                                <span className="text-gray-500"> for {plan.credits} credits</span>
+                            <h3 className={`font-display text-xl font-bold ${plan.recommended ? 'text-white' : 'text-slate-900 dark:text-white'}`}>{plan.name}</h3>
+                            <div className="mt-2 mb-5 flex items-end gap-1">
+                                <span className={`font-display text-4xl font-extrabold ${plan.recommended ? 'text-white' : 'text-slate-900 dark:text-white'}`}>₹{plan.price}</span>
+                                <span className={`mb-1 text-sm ${plan.recommended ? 'text-white/70' : 'text-slate-500'}`}>for {plan.credits} credits</span>
                             </div>
 
-                            <ul className="space-y-3 mb-6">
+                            <ul className="space-y-3 mb-7">
                                 {plan.features.map((feature, index) => (
-                                    <li key={index} className="flex items-start">
-                                        <Check size={18} className="text-green-500 mr-2 mt-0.5 flex-shrink-0" />
-                                        <span>{feature}</span>
+                                    <li key={index} className="flex items-start gap-2.5">
+                                        <span className={`mt-0.5 grid place-items-center h-5 w-5 rounded-full ${plan.recommended ? 'bg-white/20' : 'bg-brand-100 dark:bg-brand-500/15'}`}>
+                                            <Check size={13} className={plan.recommended ? 'text-white' : 'text-brand-600 dark:text-brand-300'} />
+                                        </span>
+                                        <span className={`text-sm ${plan.recommended ? 'text-white/90' : 'text-slate-600 dark:text-slate-300'}`}>{feature}</span>
                                     </li>
                                 ))}
                             </ul>
@@ -248,11 +268,11 @@ const Subscription = () => {
                             <button
                                 onClick={() => handlePurchase(plan)}
                                 disabled={processingPayment}
-                                className={`w-full py-2 rounded-md font-medium transition-colors ${
+                                className={`w-full py-3 rounded-xl font-semibold transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 ${
                                     plan.recommended
-                                        ? 'bg-purple-500 text-white hover:bg-purple-600'
-                                        : 'bg-white border border-purple-500 text-purple-500 hover:bg-purple-50'
-                                } disabled:opacity-50 flex items-center justify-center gap-2`}
+                                        ? 'bg-white text-brand-600 hover:bg-brand-50'
+                                        : 'btn-primary'
+                                }`}
                             >
                                 {processingPayment ? (
                                     <>
@@ -263,20 +283,18 @@ const Subscription = () => {
                                     <span>Purchase Plan</span>
                                 )}
                             </button>
-                        </div>
+                        </motion.div>
                     ))}
                 </div>
 
-                <div className="mt-8 bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <h3 className="font-medium mb-2">How credits work</h3>
-                    <p className="text-sm text-gray-600">
+                <div className="mt-8 card-surface p-5">
+                    <h3 className="font-display font-bold text-slate-900 dark:text-white mb-2">How credits work</h3>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
                         Each file upload consumes 1 credit. New users start with 5 free credits.
                         Credits never expire and can be used at any time. If you run out of credits,
                         you can purchase more through one of our plans above.
                     </p>
                 </div>
-
-
             </div>
         </DashboardLayout>
     )

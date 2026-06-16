@@ -16,5 +16,8 @@ module.exports = {
       'warn',
       { allowConstantExport: true },
     ],
+    // This is a plain JS (non-TypeScript) React codebase that intentionally
+    // does not use the legacy prop-types runtime validation.
+    'react/prop-types': 'off',
   },
 }
