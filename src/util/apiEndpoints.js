@@ -1,9 +1,11 @@
 // Dev: use Vite proxy (/api/v1.0 → localhost:8080) to avoid cross-origin auth issues.
 // Prod: set VITE_API_BASE_URL to your deployed API, e.g. https://your-api.onrender.com/api/v1.0
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api/v1.0";
+console.log("apiEndpoints", BASE_URL);
 
 export const apiEndpoints = {
     // Auth
+    
     REGISTER: `${BASE_URL}/auth/register`,
     LOGIN: `${BASE_URL}/auth/login`,
     VERIFY_EMAIL: (token) => `${BASE_URL}/auth/verify?token=${encodeURIComponent(token)}`,
