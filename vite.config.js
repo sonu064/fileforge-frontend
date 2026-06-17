@@ -9,7 +9,8 @@ export default defineConfig({
     // Same-origin API calls in dev — avoids CORS stripping/limiting Authorization on multipart POST.
     proxy: {
       '/api/v1.0': {
-        target: 'http://localhost:8080',
+        // Must match server.port in cloudshareapi/application-dev.properties (10000).
+        target: 'http://localhost:10000',
         changeOrigin: true,
       },
     },
